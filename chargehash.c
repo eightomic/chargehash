@@ -1,0 +1,207 @@
+/*
+  Copyright © 2026 Eightomic <eightomic@proton.me>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
+
+#include <stddef.h>
+#include <stdint.h>
+
+uint32_t chargehash32x1x1(uint8_t *key, size_t key_length, uint32_t seed) {
+  uint32_t a = seed ^ 111111;
+  uint32_t b = seed;
+  size_t i = 0;
+
+  while (i < key_length) {
+    a = ((a << 13) | (a >> 19)) + b + key[i];
+    b += a;
+    i++;
+  }
+
+  a = ((a << 17) | (a >> 15)) + b;
+  a += a << 7;
+  b += a ^ (a >> 13);
+  a += b ^ (b >> 5);
+  b += (a + (a << 17)) ^ (a >> 9);
+  return a + ((b + (b << 9)) ^ (b >> 3));
+}
+
+uint32_t chargehash32x4x1(uint8_t *key, size_t key_length, uint32_t seed) {
+  uint8_t key_remainder_length = key_length & 3;
+  uint32_t a = seed;
+  uint32_t b = seed ^ 11111111;
+  size_t i = 0;
+
+  key_length -= key_remainder_length;
+
+  while (i < key_length) {
+    a += ((a << 15) | (a >> 17)) + b + (
+      key[i]
+        | (((uint32_t)(key[i + 1])) << 8)
+        | (((uint32_t)(key[i + 2])) << 16)
+        | (((uint32_t)(key[i + 3])) << 24)
+    );
+    b += ((b << 13) | (b >> 19)) + a;
+    i += 4;
+  }
+
+  switch (key_remainder_length) {
+    case 3:
+      a += (
+        key[i]
+          | (((uint32_t)(key[i + 1])) << 8)
+          | (((uint32_t)(key[i + 2])) << 16)
+      ) + 111;
+      break;
+    case 2:
+      a += (
+        key[i]
+          | (((uint32_t)(key[i + 1])) << 8)
+      ) + 111111;
+      break;
+    case 1:
+      a += key[i] + 111111111;
+  }
+
+  a += ((a << 17) | (a >> 15)) + (a << 5) + (b ^ (b >> 5));
+  a += a << 7;
+  b += a ^ (a >> 13);
+  a += b ^ (b >> 5);
+  b += (a + (a << 17)) ^ (a >> 9);
+  return a + ((b + (b << 9)) ^ (b >> 5));
+}
+
+uint32_t chargehash32x16x1(uint8_t *key, size_t key_length, uint32_t seed) {
+  uint8_t key_remainder_length = key_length & 15;
+  uint32_t a = seed ^ 111111;
+  uint32_t b = seed ^ 1111111111;
+  uint32_t c = seed ^ 111;
+  uint32_t d = seed ^ 11111111;
+  size_t i = 0;
+
+  if (key_length >= 16) {
+    key_length -= key_remainder_length;
+
+    while (i < key_length) {
+      a += key[i]
+        | (((uint32_t)(key[i + 1])) << 8)
+        | (((uint32_t)(key[i + 2])) << 16)
+        | (((uint32_t)(key[i + 3])) << 24);
+      b += ((uint32_t)(key[i + 4]))
+        | (((uint32_t)(key[i + 5])) << 8)
+        | (((uint32_t)(key[i + 6])) << 16)
+        | (((uint32_t)(key[i + 7])) << 24);
+      c += ((uint32_t)(key[i + 8]))
+        | (((uint32_t)(key[i + 9])) << 8)
+        | (((uint32_t)(key[i + 10])) << 16)
+        | (((uint32_t)(key[i + 11])) << 24);
+      d += (d << 3) + (
+        ((uint32_t)(key[i + 12]))
+          | (((uint32_t)(key[i + 13])) << 8)
+          | (((uint32_t)(key[i + 14])) << 16)
+          | (((uint32_t)(key[i + 15])) << 24)
+      );
+      a += ((a << 17) | (a >> 15)) + d;
+      b += ((b << 19) | (b >> 13)) + c;
+      c = ((c << 19) | (c >> 13));
+      d = ((d << 13) | (d >> 19));
+      c += ((c << 15) | (c >> 17)) + a + (b << 1);
+      c += c << 3;
+      i += 16;
+    }
+
+    a = ((a << 17) | (a >> 15)) + b + d;
+    b += c + (d << 1);
+  }
+
+  switch (key_remainder_length >> 2) {
+    case 3:
+      key_remainder_length -= 12;
+      a += key[i]
+        | (((uint32_t)(key[i + 1])) << 8)
+        | (((uint32_t)(key[i + 2])) << 16)
+        | (((uint32_t)(key[i + 3])) << 24);
+      b += a + (
+        ((uint32_t)(key[i + 4]))
+          | (((uint32_t)(key[i + 5])) << 8)
+          | (((uint32_t)(key[i + 6])) << 16)
+          | (((uint32_t)(key[i + 7])) << 24)
+      );
+      c += ((uint32_t)(key[i + 8]))
+        | (((uint32_t)(key[i + 9])) << 8)
+        | (((uint32_t)(key[i + 10])) << 16)
+        | (((uint32_t)(key[i + 11])) << 24);
+      a += ((a << 17) | (a >> 15)) + b + (c << 1);
+      b += ((b << 19) | (b >> 13)) + c;
+      a = ((a << 15) | (a >> 17)) + b + d;
+      b += (b << 3) + a;
+      i += 12;
+      break;
+    case 2:
+      key_remainder_length -= 8;
+      a += key[i]
+        | (((uint32_t)(key[i + 1])) << 8)
+        | (((uint32_t)(key[i + 2])) << 16)
+        | (((uint32_t)(key[i + 3])) << 24);
+      b += (b << 3) + a + (
+        ((uint32_t)(key[i + 4]))
+          | (((uint32_t)(key[i + 5])) << 8)
+          | (((uint32_t)(key[i + 6])) << 16)
+          | (((uint32_t)(key[i + 7])) << 24)
+      );
+      b += ((b << 19) | (b >> 13)) + ((a << 17) | (a >> 15)) + c;
+      i += 8;
+      break;
+    case 1:
+      key_remainder_length -= 4;
+      a += b + ((c << 13) | (c >> 19)) + (
+        key[i]
+          | (((uint32_t)(key[i + 1])) << 8)
+          | (((uint32_t)(key[i + 2])) << 16)
+          | (((uint32_t)(key[i + 3])) << 24)
+      );
+      b += a;
+      i += 4;
+  }
+
+  switch (key_remainder_length) {
+    case 3:
+      a += (
+        key[i]
+          | (((uint32_t)(key[i + 1])) << 8)
+          | (((uint32_t)(key[i + 2])) << 16)
+      ) + 1111;
+      break;
+    case 2:
+      a += (
+        key[i]
+          | (((uint32_t)(key[i + 1])) << 8)
+      ) + 111111;
+      break;
+    case 1:
+      a += key[i] + 11111111;
+  }
+
+  a += ((a << 17) | (a >> 15)) + (a << 5) + (b ^ (b >> 5));
+  a += a << 7;
+  b += a ^ (a >> 13);
+  a += b ^ (b >> 5);
+  b += (a + (a << 17)) ^ (a >> 9);
+  return a + ((b + (b << 9)) ^ (b >> 3));
+}
